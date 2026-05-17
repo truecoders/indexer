@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Штурман",
+  "productName": "Shturman",
   "version": "0.99.0",
   "identifier": "com.shturman.app",
   "build": {
