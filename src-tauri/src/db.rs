@@ -49,6 +49,12 @@ impl Database {
             );"
         )?;
 
+        // Migration: add exclude_patterns column if missing
+        let _ = conn.execute(
+            "ALTER TABLE indexed_folders ADD COLUMN exclude_patterns TEXT NOT NULL DEFAULT '[]'",
+            [],
+        );
+
         Ok(Database {
             conn: Mutex::new(conn),
         })
@@ -67,6 +73,11 @@ pub struct IndexerFolder {
     pub total_words: i64,
     pub error_count: i64,
     pub watch_enabled: bool,
+    pub exclude_patterns: Vec<String>,
+}
+
+fn parse_exclude_patterns(json: &str) -> Vec<String> {
+    serde_json::from_str(json).unwrap_or_default()
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -110,10 +121,11 @@ pub fn add_folder(db: &Database, path: &str) -> Result<IndexerFolder> {
         params![path],
     )?;
     let mut stmt = conn.prepare(
-        "SELECT id, path, created_at, last_indexed, file_count, total_words, error_count, watch_enabled
+        "SELECT id, path, created_at, last_indexed, file_count, total_words, error_count, watch_enabled, exclude_patterns
          FROM indexed_folders WHERE path = ?1"
     )?;
     let folder = stmt.query_row(params![path], |row| {
+        let ep: String = row.get(8)?;
         Ok(IndexerFolder {
             id: row.get(0)?,
             path: row.get(1)?,
@@ -123,6 +135,7 @@ pub fn add_folder(db: &Database, path: &str) -> Result<IndexerFolder> {
             total_words: row.get(5)?,
             error_count: row.get(6)?,
             watch_enabled: row.get::<_, i64>(7)? != 0,
+            exclude_patterns: parse_exclude_patterns(&ep),
         })
     })?;
     Ok(folder)
@@ -143,10 +156,11 @@ pub fn remove_folder(db: &Database, id: i64) -> Result<()> {
 pub fn list_folders(db: &Database) -> Result<Vec<IndexerFolder>> {
     let conn = db.conn.lock().unwrap();
     let mut stmt = conn.prepare(
-        "SELECT id, path, created_at, last_indexed, file_count, total_words, error_count, watch_enabled
+        "SELECT id, path, created_at, last_indexed, file_count, total_words, error_count, watch_enabled, exclude_patterns
          FROM indexed_folders ORDER BY created_at DESC"
     )?;
     let folders = stmt.query_map([], |row| {
+        let ep: String = row.get(8)?;
         Ok(IndexerFolder {
             id: row.get(0)?,
             path: row.get(1)?,
@@ -156,6 +170,7 @@ pub fn list_folders(db: &Database) -> Result<Vec<IndexerFolder>> {
             total_words: row.get(5)?,
             error_count: row.get(6)?,
             watch_enabled: row.get::<_, i64>(7)? != 0,
+            exclude_patterns: parse_exclude_patterns(&ep),
         })
     })?.filter_map(|r| r.ok()).collect();
     Ok(folders)
@@ -177,6 +192,8 @@ pub fn search(
     match_type: &str,
     folder_id: Option<i64>,
     file_types: Option<Vec<String>>,
+    sort_by: &str,
+    sort_dir: &str,
 ) -> Result<Vec<SearchResult>> {
     let conn = db.conn.lock().unwrap();
 
@@ -240,6 +257,13 @@ pub fn search(
         format!("AND {}", conditions.join(" AND "))
     };
 
+    let order_clause = match sort_by {
+        "date" => format!("d.modified_at {}", if sort_dir == "asc" { "ASC" } else { "DESC" }),
+        "size" => format!("d.size_bytes {}", if sort_dir == "asc" { "ASC" } else { "DESC" }),
+        "name" => format!("d.filename COLLATE NOCASE {}", if sort_dir == "asc" { "ASC" } else { "DESC" }),
+        _ => "rank".to_string(),
+    };
+
     let sql = format!(
         "SELECT d.id, d.folder_id, d.path, d.filename, d.file_type, d.size_bytes, d.modified_at, d.word_count,
                 snippet(documents_fts, 1, '<mark>', '</mark>', '...', 10) as filename_snippet,
@@ -248,9 +272,9 @@ pub fn search(
          JOIN indexed_documents d ON d.id = fts.document_id
          WHERE documents_fts MATCH ?1
          {}
-         ORDER BY rank
+         ORDER BY {}
          LIMIT 100",
-        where_clause
+        where_clause, order_clause
     );
 
     let mut all_params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(fts_match)];
@@ -290,4 +314,26 @@ pub fn update_folder_stats(db: &Database, folder_id: i64) -> Result<()> {
         params![folder_id],
     )?;
     Ok(())
+}
+
+/// Update exclude patterns for a folder
+pub fn update_exclude_patterns(db: &Database, folder_id: i64, patterns: &[String]) -> Result<()> {
+    let conn = db.conn.lock().unwrap();
+    let json = serde_json::to_string(patterns).unwrap_or_else(|_| "[]".to_string());
+    conn.execute(
+        "UPDATE indexed_folders SET exclude_patterns = ?1 WHERE id = ?2",
+        params![json, folder_id],
+    )?;
+    Ok(())
+}
+
+/// Get exclude patterns for a folder
+pub fn get_exclude_patterns(db: &Database, folder_id: i64) -> Result<Vec<String>> {
+    let conn = db.conn.lock().unwrap();
+    let json: String = conn.query_row(
+        "SELECT exclude_patterns FROM indexed_folders WHERE id = ?1",
+        params![folder_id],
+        |row| row.get(0),
+    )?;
+    Ok(parse_exclude_patterns(&json))
 }

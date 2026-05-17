@@ -12,6 +12,8 @@ import {
   Divider,
   Title,
   Badge,
+  TagsInput,
+  Collapse,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -22,6 +24,9 @@ import {
   IconCheck,
   IconX,
   IconAlertTriangle,
+  IconFilter,
+  IconChevronDown,
+  IconChevronRight,
 } from '@tabler/icons-react';
 import { commands } from '../../utils/commands';
 import type { IndexerFolder, IndexerStats, IndexProgress } from '../../utils/types';
@@ -31,6 +36,7 @@ export function SettingsView() {
   const [folders, setFolders] = useState<IndexerFolder[]>([]);
   const [stats, setStats] = useState<IndexerStats>({ folder_count: 0, file_count: 0, total_words: 0, error_count: 0 });
   const [progress, setProgress] = useState<Record<number, IndexProgress>>({});
+  const [expandedExcludes, setExpandedExcludes] = useState<Record<number, boolean>>({});
 
   const loadData = useCallback(async () => {
     try {
@@ -44,13 +50,10 @@ export function SettingsView() {
 
   useEffect(() => {
     loadData();
-
-    // Listen for indexing progress
     let unlisten: (() => void) | undefined;
     commands.onProgress((data) => {
       setProgress((prev) => ({ ...prev, [data.folder_id]: data }));
       if (data.done) {
-        // Reload data when indexing finishes
         setTimeout(() => {
           loadData();
           setProgress((prev) => {
@@ -61,7 +64,6 @@ export function SettingsView() {
         }, 500);
       }
     }).then((fn) => { unlisten = fn; });
-
     return () => { unlisten?.(); };
   }, [loadData]);
 
@@ -159,6 +161,37 @@ export function SettingsView() {
     }
   };
 
+  const handleUpdateExcludePatterns = async (id: number, patterns: string[]) => {
+    try {
+      await commands.updateExcludePatterns(id, patterns);
+      // Update local state immediately
+      setFolders((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, exclude_patterns: patterns } : f))
+      );
+      notifications.show({
+        title: 'Исключения обновлены',
+        message: patterns.length > 0
+          ? `${patterns.length} паттернов. Переиндексируйте папку для применения.`
+          : 'Все исключения сняты.',
+        color: 'olive',
+        icon: <IconFilter size={18} />,
+        autoClose: 3000,
+      });
+    } catch (e) {
+      notifications.show({
+        title: 'Ошибка',
+        message: `${e}`,
+        color: 'red',
+        icon: <IconX size={18} />,
+        autoClose: 5000,
+      });
+    }
+  };
+
+  const toggleExcludes = (id: number) => {
+    setExpandedExcludes((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const formatPath = (path: string) => {
     if (path.length > 60) return '...' + path.slice(-57);
     return path;
@@ -206,6 +239,7 @@ export function SettingsView() {
         {folders.map((folder) => {
           const prog = progress[folder.id];
           const isIndexing = prog && !prog.done;
+          const isExcludesOpen = expandedExcludes[folder.id] || false;
 
           return (
             <Card key={folder.id} padding="sm" radius="md" withBorder>
@@ -246,13 +280,32 @@ export function SettingsView() {
                 )}
 
                 <Group justify="space-between">
-                  <Switch
-                    id={`watcher-${folder.id}`}
-                    label="Автоотслеживание"
-                    size="xs"
-                    checked={folder.watch_enabled}
-                    onChange={(e) => handleToggleWatcher(folder.id, e.currentTarget.checked)}
-                  />
+                  <Group gap="sm">
+                    <Switch
+                      id={`watcher-${folder.id}`}
+                      label="Автоотслеживание"
+                      size="xs"
+                      checked={folder.watch_enabled}
+                      onChange={(e) => handleToggleWatcher(folder.id, e.currentTarget.checked)}
+                    />
+                    <Text
+                      size="xs"
+                      c="dimmed"
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => toggleExcludes(folder.id)}
+                    >
+                      <Group gap={4} wrap="nowrap">
+                        {isExcludesOpen ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+                        <IconFilter size={12} />
+                        Исключения
+                        {folder.exclude_patterns.length > 0 && (
+                          <Badge size="xs" variant="dot" color="orange">
+                            {folder.exclude_patterns.length}
+                          </Badge>
+                        )}
+                      </Group>
+                    </Text>
+                  </Group>
 
                   <Group gap={4}>
                     <Tooltip label="Переиндексировать">
@@ -278,6 +331,17 @@ export function SettingsView() {
                     </Tooltip>
                   </Group>
                 </Group>
+
+                {/* Exclude patterns editor */}
+                <Collapse in={isExcludesOpen}>
+                  <TagsInput
+                    size="xs"
+                    placeholder="node_modules, .git, ~$*, *.tmp"
+                    description="Введите паттерн и нажмите Enter. Примеры: node_modules, *.tmp, ~$*"
+                    value={folder.exclude_patterns}
+                    onChange={(patterns) => handleUpdateExcludePatterns(folder.id, patterns)}
+                  />
+                </Collapse>
               </Stack>
             </Card>
           );

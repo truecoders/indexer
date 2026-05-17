@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  TextInput,
+  Autocomplete,
   SegmentedControl,
   Select,
   MultiSelect,
@@ -11,12 +11,27 @@ import {
   Loader,
   Badge,
   Box,
+  ActionIcon,
+  Tooltip,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconSearch, IconFileOff } from '@tabler/icons-react';
-import { commands } from '../../utils/commands';
-import type { SearchResult, IndexerFolder, SearchMode, MatchType } from '../../utils/types';
+import {
+  IconSearch,
+  IconFileOff,
+  IconSortAscending,
+  IconSortDescending,
+  IconX,
+} from '@tabler/icons-react';
+import { commands, getSearchHistory, addToSearchHistory, clearSearchHistory } from '../../utils/commands';
+import type { SearchResult, IndexerFolder, SearchMode, MatchType, SortBy, SortDir } from '../../utils/types';
 import { ResultCard } from './ResultCard';
+
+const SORT_OPTIONS = [
+  { value: 'relevance', label: 'По релевантности' },
+  { value: 'date', label: 'По дате' },
+  { value: 'size', label: 'По размеру' },
+  { value: 'name', label: 'По имени' },
+];
 
 export function SearchView() {
   const [query, setQuery] = useState('');
@@ -25,9 +40,12 @@ export function SearchView() {
   const [matchType, setMatchType] = useState<MatchType>('partial');
   const [folderId, setFolderId] = useState<string | null>(null);
   const [fileTypes, setFileTypes] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>('relevance');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [folders, setFolders] = useState<IndexerFolder[]>([]);
+  const [history, setHistory] = useState<string[]>(getSearchHistory());
 
   // Load folders for filter
   useEffect(() => {
@@ -49,16 +67,21 @@ export function SearchView() {
         matchType,
         folderId ? parseInt(folderId) : null,
         fileTypes.length > 0 ? fileTypes : null,
+        sortBy,
+        sortDir,
       )
       .then((res) => {
         setResults(res);
         setLoading(false);
+        // Save to history
+        addToSearchHistory(debouncedQuery);
+        setHistory(getSearchHistory());
       })
       .catch((err) => {
         console.error(err);
         setLoading(false);
       });
-  }, [debouncedQuery, mode, matchType, folderId, fileTypes]);
+  }, [debouncedQuery, mode, matchType, folderId, fileTypes, sortBy, sortDir]);
 
   const folderOptions = folders.map((f) => ({
     value: f.id.toString(),
@@ -74,22 +97,45 @@ export function SearchView() {
     { value: 'csv', label: 'CSV (.csv)' },
   ];
 
+  const handleClearHistory = () => {
+    clearSearchHistory();
+    setHistory([]);
+  };
+
+  const toggleSortDir = () => {
+    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
   return (
     <Stack gap="md" p="md" style={{ height: '100%', overflow: 'hidden' }}>
-      {/* Search input */}
-      <TextInput
-        id="search-input"
-        placeholder="Поиск по документам..."
-        leftSection={<IconSearch size={18} />}
-        value={query}
-        onChange={(e) => setQuery(e.currentTarget.value)}
-        size="md"
-        styles={{
-          input: {
-            fontSize: '15px',
-          },
-        }}
-      />
+      {/* Search input with history autocomplete */}
+      <Group gap="xs" wrap="nowrap">
+        <Autocomplete
+          id="search-input"
+          placeholder="Поиск по документам..."
+          leftSection={<IconSearch size={18} />}
+          rightSection={
+            query ? (
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="xs"
+                onClick={() => { setQuery(''); setResults([]); }}
+              >
+                <IconX size={14} />
+              </ActionIcon>
+            ) : null
+          }
+          data={history}
+          value={query}
+          onChange={setQuery}
+          size="md"
+          style={{ flex: 1 }}
+          styles={{
+            input: { fontSize: '15px' },
+          }}
+        />
+      </Group>
 
       {/* Filters row */}
       <Group gap="sm" wrap="wrap">
@@ -137,14 +183,47 @@ export function SearchView() {
           size="xs"
           style={{ minWidth: 180 }}
         />
+
+        {/* Sort controls */}
+        <Group gap={4} wrap="nowrap">
+          <Select
+            id="sort-by"
+            data={SORT_OPTIONS}
+            value={sortBy}
+            onChange={(v) => setSortBy((v as SortBy) || 'relevance')}
+            size="xs"
+            style={{ minWidth: 150 }}
+            allowDeselect={false}
+          />
+          <Tooltip label={sortDir === 'asc' ? 'По возрастанию' : 'По убыванию'}>
+            <ActionIcon
+              variant="subtle"
+              color="olive"
+              size="sm"
+              onClick={toggleSortDir}
+            >
+              {sortDir === 'asc' ? <IconSortAscending size={16} /> : <IconSortDescending size={16} />}
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
 
-      {/* Results count */}
+      {/* Results count + clear history */}
       {debouncedQuery.trim() && !loading && (
-        <Group gap="xs">
+        <Group gap="xs" justify="space-between">
           <Badge variant="light" color="olive" size="sm">
             Найдено: {results.length}
           </Badge>
+          {history.length > 0 && (
+            <Text
+              size="xs"
+              c="dimmed"
+              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={handleClearHistory}
+            >
+              Очистить историю
+            </Text>
+          )}
         </Group>
       )}
 

@@ -9,6 +9,7 @@ export interface IndexerFolder {
   total_words: number;
   error_count: number;
   watch_enabled: boolean;
+  exclude_patterns: string[];
 }
 
 export interface SearchResult {
@@ -42,3 +43,5 @@ export interface IndexProgress {
 
 export type SearchMode = 'all' | 'filename' | 'content';
 export type MatchType = 'partial' | 'exact';
+export type SortBy = 'relevance' | 'date' | 'size' | 'name';
+export type SortDir = 'asc' | 'desc';

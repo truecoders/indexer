@@ -71,8 +71,12 @@ pub async fn search(
     match_type: String,
     folder_id: Option<i64>,
     file_types: Option<Vec<String>>,
+    sort_by: Option<String>,
+    sort_dir: Option<String>,
 ) -> Result<Vec<SearchResult>, String> {
-    db::search(&db, &query, &mode, &match_type, folder_id, file_types).map_err(|e| e.to_string())
+    let sb = sort_by.unwrap_or_else(|| "relevance".to_string());
+    let sd = sort_dir.unwrap_or_else(|| "desc".to_string());
+    db::search(&db, &query, &mode, &match_type, folder_id, file_types, &sb, &sd).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -123,4 +127,13 @@ pub async fn toggle_watcher(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn update_exclude_patterns(
+    db: State<'_, Arc<Database>>,
+    id: i64,
+    patterns: Vec<String>,
+) -> Result<(), String> {
+    db::update_exclude_patterns(&db, id, &patterns).map_err(|e| e.to_string())
 }

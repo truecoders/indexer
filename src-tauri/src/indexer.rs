@@ -13,10 +13,14 @@ pub fn index_folder(app: &AppHandle, db: &Database, folder_id: i64, folder_path:
         return Err(format!("Folder does not exist: {}", folder_path));
     }
 
-    // Collect all supported files
+    // Load exclude patterns for this folder
+    let exclude_patterns = db::get_exclude_patterns(db, folder_id).unwrap_or_default();
+
+    // Collect all supported files (respecting exclude patterns)
     let files: Vec<_> = WalkDir::new(folder)
         .follow_links(true)
         .into_iter()
+        .filter_entry(|e| !should_exclude(e.path(), &exclude_patterns))
         .filter_map(|e| e.ok())
         .filter(|e| {
             if !e.file_type().is_file() { return false; }
@@ -247,4 +251,51 @@ fn format_system_time(time: std::time::SystemTime) -> String {
 
 fn is_leap_year(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+/// Check if a path should be excluded based on patterns
+fn should_exclude(path: &Path, patterns: &[String]) -> bool {
+    if patterns.is_empty() {
+        return false;
+    }
+
+    let file_name = path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let file_name_lower = file_name.to_lowercase();
+
+    for pattern in patterns {
+        let pat = pattern.trim().to_lowercase();
+        if pat.is_empty() { continue; }
+
+        // *.ext → match file extension
+        if pat.starts_with("*.") {
+            let ext = &pat[2..];
+            if let Some(file_ext) = path.extension() {
+                if file_ext.to_string_lossy().to_lowercase() == ext {
+                    return true;
+                }
+            }
+            continue;
+        }
+
+        // pattern* → prefix match on filename (e.g. ~$*)
+        if pat.ends_with('*') {
+            let prefix = &pat[..pat.len()-1];
+            if file_name_lower.starts_with(prefix) {
+                return true;
+            }
+            continue;
+        }
+
+        // Exact match on any path component (directory or file name)
+        for component in path.components() {
+            if let std::path::Component::Normal(c) = component {
+                if c.to_string_lossy().to_lowercase() == pat {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
