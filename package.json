@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:exe": "npm run tauri build && powershell -Command \"Copy-Item -Path src-tauri/target/release/indexer-app.exe -Destination ./Indexer.exe -Force\"",
-    "start:exe": "powershell -Command \"Start-Process ./Indexer.exe\""
+    "start:exe": "powershell -Command \"Start-Process ./Indexer.exe\"",
+    "build:linux": "npm run tauri build && cp src-tauri/target/release/indexer-app ./indexer"
   },
   "dependencies": {
     "@mantine/core": "^9.2.1",

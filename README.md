@@ -52,9 +52,22 @@ npm install
 npm run tauri dev
 ```
 
-### Сборка standalone-версии (`Indexer.exe`)
+### Сборка standalone-версии под Windows (`Indexer.exe`)
 Сборка компилирует оптимизированный бинарный файл на Rust, упаковывает фронтенд и копирует готовый исполняемый файл в корневую директорию проекта:
 ```bash
 npm run build:exe
 ```
-После завершения в корне проекта появится файл `Indexer.exe`, готовый к запуску и переносу на любой компьютер.
+После завершения в корне проекта появится файл `Indexer.exe`, готовый к запуску.
+
+### Сборка standalone-версии под Linux (`indexer`)
+Для сборки под Linux (Debian/Ubuntu) необходимо предварительно установить системные зависимости WebKitGTK:
+```bash
+sudo apt update
+sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+После установки запустите команду сборки:
+```bash
+npm run build:linux
+```
+После завершения в корне проекта появится готовый исполняемый файл `indexer`, а также `.deb` пакет и `AppImage` в папке `src-tauri/target/release/bundle/`.
