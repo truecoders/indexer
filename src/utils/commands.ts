@@ -37,6 +37,9 @@ export const commands = {
   openFile: (path: string) =>
     invoke('open_file', { path }),
 
+  previewFile: (path: string) =>
+    invoke<string>('preview_file', { path }),
+
   showInFolder: (path: string) =>
     invoke('show_in_folder', { path }),
 

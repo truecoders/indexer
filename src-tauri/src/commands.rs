@@ -85,6 +85,23 @@ pub async fn open_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn preview_file(path: String) -> Result<String, String> {
+    let file_path = std::path::Path::new(&path);
+    if !file_path.exists() {
+        return Err("Файл не найден".to_string());
+    }
+
+    let extension = file_path.extension()
+        .map(|e| e.to_string_lossy().to_string().to_lowercase())
+        .unwrap_or_default();
+
+    match crate::parsers::get_parser(&extension) {
+        Some(parser) => parser.extract_text(file_path),
+        None => Err(format!("Неподдерживаемый формат: .{}", extension)),
+    }
+}
+
+#[tauri::command]
 pub async fn show_in_folder(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {

@@ -60,6 +60,7 @@ pub fn run() {
             commands::reindex,
             commands::search,
             commands::open_file,
+            commands::preview_file,
             commands::show_in_folder,
             commands::get_stats,
             commands::toggle_watcher,

@@ -1,10 +1,12 @@
 import { Card, Group, Text, Badge, ActionIcon, Tooltip, Stack, Box } from '@mantine/core';
-import { IconFile, IconFileTypePdf, IconFileTypeDocx, IconFileSpreadsheet, IconFileText, IconExternalLink, IconFolderOpen } from '@tabler/icons-react';
+import { IconFile, IconFileTypePdf, IconFileTypeDocx, IconFileSpreadsheet, IconFileText, IconExternalLink, IconFolderOpen, IconEye } from '@tabler/icons-react';
 import { commands } from '../../utils/commands';
 import type { SearchResult } from '../../utils/types';
 
 interface ResultCardProps {
   result: SearchResult;
+  isActive?: boolean;
+  onPreview?: (result: SearchResult) => void;
 }
 
 const FILE_ICONS: Record<string, typeof IconFile> = {
@@ -43,7 +45,7 @@ function formatDate(dateStr: string): string {
   return dateStr;
 }
 
-export function ResultCard({ result }: ResultCardProps) {
+export function ResultCard({ result, isActive, onPreview }: ResultCardProps) {
   const FileIcon = FILE_ICONS[result.file_type] || IconFile;
   const badgeColor = FILE_COLORS[result.file_type] || 'gray';
 
@@ -63,6 +65,14 @@ export function ResultCard({ result }: ResultCardProps) {
     }
   };
 
+  const handleClick = () => {
+    if (onPreview) {
+      onPreview(result);
+    } else {
+      handleOpen();
+    }
+  };
+
   // Truncate path for display
   const displayPath = result.path.length > 80
     ? '...' + result.path.slice(-77)
@@ -75,8 +85,10 @@ export function ResultCard({ result }: ResultCardProps) {
       radius="md"
       withBorder
       style={{
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
         cursor: 'pointer',
+        borderColor: isActive ? 'var(--mantine-color-olive-4)' : undefined,
+        backgroundColor: isActive ? 'var(--mantine-color-olive-0)' : undefined,
       }}
       styles={{
         root: {
@@ -86,7 +98,7 @@ export function ResultCard({ result }: ResultCardProps) {
           },
         },
       }}
-      onClick={handleOpen}
+      onClick={handleClick}
     >
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
@@ -140,6 +152,16 @@ export function ResultCard({ result }: ResultCardProps) {
 
         {/* Action buttons */}
         <Group gap={4} style={{ flexShrink: 0 }}>
+          <Tooltip label="Предпросмотр">
+            <ActionIcon
+              variant={isActive ? 'filled' : 'subtle'}
+              color="olive"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); onPreview?.(result); }}
+            >
+              <IconEye size={16} />
+            </ActionIcon>
+          </Tooltip>
           <Tooltip label="Открыть файл">
             <ActionIcon
               variant="subtle"
