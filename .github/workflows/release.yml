@@ -56,6 +56,6 @@ jobs:
           tagName: v__VERSION__ # Автоматически подставляется из tauri.conf.json
           releaseName: 'Штурман v__VERSION__'
           releaseBody: 'Автоматический релиз приложения «Штурман» v__VERSION__. Быстрый, конфиденциальный и удобный поиск документов. Доступно для Windows, Linux и macOS.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
