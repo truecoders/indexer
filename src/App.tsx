@@ -1,3 +1,4 @@
+import logo from './assets/logo.png';
 import { useState, useEffect, useCallback } from 'react';
 import {
   MantineProvider,
@@ -5,7 +6,6 @@ import {
   NavLink,
   Group,
   Text,
-  ThemeIcon,
   Box,
   Divider,
   Stack,
@@ -21,7 +21,6 @@ import '@mantine/notifications/styles.css';
 import {
   IconSearch,
   IconSettings,
-  IconFileSearch,
   IconFolder,
   IconFile,
   IconLetterCase,
@@ -171,12 +170,10 @@ function App() {
           {/* Logo area */}
           <Box mb="md" pt="xs" pb="xs" px="xs">
             <Group gap="sm" wrap="nowrap">
-              <ThemeIcon size="lg" radius="md" variant="filled" color="olive">
-                <IconFileSearch size={20} />
-              </ThemeIcon>
+              <img src={logo} alt="Штурман" style={{ width: 34, height: 34, objectFit: 'contain' }} />
               <div>
-                <Text size="sm" fw={700} lh={1.2}>Индексатор</Text>
-                <Text size="xs" c="dimmed" lh={1.2}>файлов</Text>
+                <Text size="sm" fw={700} lh={1.2}>Штурман</Text>
+                <Text size="xs" c="dimmed" lh={1.2}>поиск документов</Text>
               </div>
             </Group>
           </Box>

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Indexer",
+  "productName": "Штурман",
   "version": "0.99.0",
-  "identifier": "com.indexer.app",
+  "identifier": "com.shturman.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Индексатор файлов",
+        "title": "Штурман",
         "width": 1100,
         "height": 700,
         "minWidth": 800,
