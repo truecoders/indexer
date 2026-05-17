@@ -4,6 +4,9 @@ on:
     tags:
       - 'v*' # Запуск при пуше тэгов версии (например, v0.99.0)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     permissions:
@@ -29,7 +32,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -51,8 +54,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__ # Автоматически подставляется из tauri.conf.json
-          releaseName: 'Indexer v__VERSION__'
-          releaseBody: 'Автоматический релиз Индексатора файлов v__VERSION__. Доступен для Windows, Linux и macOS.'
+          releaseName: 'Штурман v__VERSION__'
+          releaseBody: 'Автоматический релиз приложения «Штурман» v__VERSION__. Быстрый, конфиденциальный и удобный поиск документов. Доступно для Windows, Linux и macOS.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
