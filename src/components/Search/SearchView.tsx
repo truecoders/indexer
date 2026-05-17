@@ -128,6 +128,13 @@ export function SearchView({ initialParams, onHistoryUpdate }: SearchViewProps) 
     );
   }, [query, mode, matchType, folderId, fileTypes, sortBy, sortDir, performSearchWithParams]);
 
+  // Rerun search immediately when filters or sorting change, if an active search exists
+  useEffect(() => {
+    if (hasSearched && query.trim()) {
+      performSearch();
+    }
+  }, [mode, matchType, folderId, fileTypes, sortBy, sortDir, performSearch]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();

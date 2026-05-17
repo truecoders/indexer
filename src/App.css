@@ -66,8 +66,23 @@ mark {
 }
 
 /* Segmented control active style */
+.mantine-SegmentedControl-root {
+  background-color: var(--mantine-color-gray-0);
+  border: 1px solid var(--mantine-color-gray-2);
+}
+
 .mantine-SegmentedControl-indicator {
-  background-color: var(--mantine-color-olive-6);
+  background-color: var(--mantine-color-olive-6) !important;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.mantine-SegmentedControl-label {
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.mantine-SegmentedControl-label[data-active] {
+  color: var(--mantine-color-white) !important;
 }
 
 /* Search history items in sidebar */

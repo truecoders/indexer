@@ -71,6 +71,13 @@ impl Database {
             [],
         );
 
+        // One-time migration: Populate empty/missing exclude patterns with the default set
+        let default_excludes = serde_json::to_string(&vec!["node_modules", ".git", "~$*", "*.tmp"]).unwrap();
+        let _ = conn.execute(
+            "UPDATE indexed_folders SET exclude_patterns = ?1 WHERE exclude_patterns = '[]' OR exclude_patterns IS NULL OR exclude_patterns = ''",
+            params![default_excludes],
+        );
+
         Ok(Database {
             conn: Mutex::new(conn),
         })
