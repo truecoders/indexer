@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import type { IndexerFolder, SearchResult, IndexerStats, IndexProgress, SearchMode, MatchType, SortBy, SortDir } from './types';
+import type { IndexerFolder, SearchResult, IndexerStats, IndexProgress, SearchMode, MatchType, SortBy, SortDir, SearchHistoryEntry } from './types';
 
 export const commands = {
   addFolder: () =>
@@ -52,31 +52,32 @@ export const commands = {
   updateExcludePatterns: (id: number, patterns: string[]) =>
     invoke('update_exclude_patterns', { id, patterns }),
 
+  // Search history (DB-backed)
+  addSearchHistory: (
+    query: string,
+    mode: string,
+    matchType: string,
+    folderId: number | null,
+    fileTypes: string[],
+    sortBy: string,
+    sortDir: string,
+  ) =>
+    invoke('add_search_history', {
+      query,
+      mode,
+      matchType,
+      folderId,
+      fileTypes,
+      sortBy,
+      sortDir,
+    }),
+
+  listSearchHistory: () =>
+    invoke<SearchHistoryEntry[]>('list_search_history'),
+
+  removeSearchHistory: (id: number) =>
+    invoke('remove_search_history', { id }),
+
   onProgress: (cb: (data: IndexProgress) => void): Promise<UnlistenFn> =>
     listen<IndexProgress>('indexer:progress', (e) => cb(e.payload)),
 };
-
-// === Search History (localStorage) ===
-
-const HISTORY_KEY = 'indexer-search-history';
-const MAX_HISTORY = 20;
-
-export function getSearchHistory(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-export function addToSearchHistory(query: string) {
-  if (!query || query.trim().length < 2) return;
-  const trimmed = query.trim();
-  const history = getSearchHistory().filter((h) => h !== trimmed);
-  history.unshift(trimmed);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
-}
-
-export function clearSearchHistory() {
-  localStorage.removeItem(HISTORY_KEY);
-}

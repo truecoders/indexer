@@ -41,6 +41,18 @@ export interface IndexProgress {
   done: boolean;
 }
 
+export interface SearchHistoryEntry {
+  id: number;
+  query: string;
+  mode: SearchMode;
+  match_type: MatchType;
+  folder_id: number | null;
+  file_types: string[];
+  sort_by: SortBy;
+  sort_dir: SortDir;
+  created_at: string;
+}
+
 export type SearchMode = 'all' | 'filename' | 'content';
 export type MatchType = 'partial' | 'exact';
 export type SortBy = 'relevance' | 'date' | 'size' | 'name';

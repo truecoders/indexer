@@ -69,3 +69,18 @@ mark {
 .mantine-SegmentedControl-indicator {
   background-color: var(--mantine-color-olive-6);
 }
+
+/* Search history items in sidebar */
+.history-item:hover {
+  background: rgba(139, 154, 74, 0.1);
+}
+
+.history-item:hover .history-delete {
+  opacity: 1 !important;
+}
+
+/* Autocomplete/TextInput focus */
+.mantine-Autocomplete-input:focus {
+  border-color: var(--mantine-color-olive-5);
+  box-shadow: 0 0 0 2px rgba(139, 154, 74, 0.2);
+}

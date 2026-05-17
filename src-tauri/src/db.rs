@@ -47,6 +47,22 @@ impl Database {
                 content,
                 tokenize = 'unicode61'
             );"
+        )?
+        ;
+
+        // Search history table
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS search_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                query       TEXT NOT NULL,
+                mode        TEXT NOT NULL DEFAULT 'all',
+                match_type  TEXT NOT NULL DEFAULT 'partial',
+                folder_id   INTEGER,
+                file_types  TEXT NOT NULL DEFAULT '[]',
+                sort_by     TEXT NOT NULL DEFAULT 'relevance',
+                sort_dir    TEXT NOT NULL DEFAULT 'desc',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );"
         )?;
 
         // Migration: add exclude_patterns column if missing
@@ -112,13 +128,27 @@ pub struct IndexProgress {
     pub done: bool,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct SearchHistoryEntry {
+    pub id: i64,
+    pub query: String,
+    pub mode: String,
+    pub match_type: String,
+    pub folder_id: Option<i64>,
+    pub file_types: Vec<String>,
+    pub sort_by: String,
+    pub sort_dir: String,
+    pub created_at: String,
+}
+
 // === DB Operations ===
 
 pub fn add_folder(db: &Database, path: &str) -> Result<IndexerFolder> {
     let conn = db.conn.lock().unwrap();
+    let default_excludes = serde_json::to_string(&vec!["node_modules", ".git", "~$*", "*.tmp"]).unwrap();
     conn.execute(
-        "INSERT OR IGNORE INTO indexed_folders (path) VALUES (?1)",
-        params![path],
+        "INSERT OR IGNORE INTO indexed_folders (path, exclude_patterns) VALUES (?1, ?2)",
+        params![path, default_excludes],
     )?;
     let mut stmt = conn.prepare(
         "SELECT id, path, created_at, last_indexed, file_count, total_words, error_count, watch_enabled, exclude_patterns
@@ -336,4 +366,62 @@ pub fn get_exclude_patterns(db: &Database, folder_id: i64) -> Result<Vec<String>
         |row| row.get(0),
     )?;
     Ok(parse_exclude_patterns(&json))
+}
+
+// === Search History ===
+
+pub fn add_search_history(
+    db: &Database,
+    query: &str,
+    mode: &str,
+    match_type: &str,
+    folder_id: Option<i64>,
+    file_types: &[String],
+    sort_by: &str,
+    sort_dir: &str,
+) -> Result<()> {
+    let conn = db.conn.lock().unwrap();
+    // Remove duplicate by query text
+    conn.execute("DELETE FROM search_history WHERE query = ?1", params![query])?;
+    let ft_json = serde_json::to_string(file_types).unwrap_or_else(|_| "[]".to_string());
+    conn.execute(
+        "INSERT INTO search_history (query, mode, match_type, folder_id, file_types, sort_by, sort_dir)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![query, mode, match_type, folder_id, ft_json, sort_by, sort_dir],
+    )?;
+    // Keep only last 20
+    conn.execute(
+        "DELETE FROM search_history WHERE id NOT IN (SELECT id FROM search_history ORDER BY created_at DESC LIMIT 20)",
+        [],
+    )?;
+    Ok(())
+}
+
+pub fn list_search_history(db: &Database) -> Result<Vec<SearchHistoryEntry>> {
+    let conn = db.conn.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT id, query, mode, match_type, folder_id, file_types, sort_by, sort_dir, created_at
+         FROM search_history ORDER BY created_at DESC LIMIT 20"
+    )?;
+    let entries = stmt.query_map([], |row| {
+        let ft_json: String = row.get(5)?;
+        Ok(SearchHistoryEntry {
+            id: row.get(0)?,
+            query: row.get(1)?,
+            mode: row.get(2)?,
+            match_type: row.get(3)?,
+            folder_id: row.get(4)?,
+            file_types: serde_json::from_str(&ft_json).unwrap_or_default(),
+            sort_by: row.get(6)?,
+            sort_dir: row.get(7)?,
+            created_at: row.get(8)?,
+        })
+    })?.filter_map(|r| r.ok()).collect();
+    Ok(entries)
+}
+
+pub fn remove_search_history(db: &Database, id: i64) -> Result<()> {
+    let conn = db.conn.lock().unwrap();
+    conn.execute("DELETE FROM search_history WHERE id = ?1", params![id])?;
+    Ok(())
 }

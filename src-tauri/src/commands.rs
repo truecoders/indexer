@@ -1,4 +1,4 @@
-use crate::db::{self, Database, IndexerFolder, SearchResult, IndexerStats};
+use crate::db::{self, Database, IndexerFolder, SearchResult, IndexerStats, SearchHistoryEntry};
 use crate::indexer;
 use crate::watcher::WatcherState;
 use std::sync::Arc;
@@ -153,4 +153,34 @@ pub async fn update_exclude_patterns(
     patterns: Vec<String>,
 ) -> Result<(), String> {
     db::update_exclude_patterns(&db, id, &patterns).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_search_history(
+    db: State<'_, Arc<Database>>,
+    query: String,
+    mode: String,
+    match_type: String,
+    folder_id: Option<i64>,
+    file_types: Vec<String>,
+    sort_by: String,
+    sort_dir: String,
+) -> Result<(), String> {
+    db::add_search_history(&db, &query, &mode, &match_type, folder_id, &file_types, &sort_by, &sort_dir)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_search_history(
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<SearchHistoryEntry>, String> {
+    db::list_search_history(&db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_search_history(
+    db: State<'_, Arc<Database>>,
+    id: i64,
+) -> Result<(), String> {
+    db::remove_search_history(&db, id).map_err(|e| e.to_string())
 }

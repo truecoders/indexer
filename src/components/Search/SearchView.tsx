@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Autocomplete,
+  TextInput,
   SegmentedControl,
   Select,
   MultiSelect,
@@ -13,8 +13,8 @@ import {
   Box,
   ActionIcon,
   Tooltip,
+  Button,
 } from '@mantine/core';
-import { useDebouncedValue } from '@mantine/hooks';
 import {
   IconSearch,
   IconFileOff,
@@ -22,8 +22,8 @@ import {
   IconSortDescending,
   IconX,
 } from '@tabler/icons-react';
-import { commands, getSearchHistory, addToSearchHistory, clearSearchHistory } from '../../utils/commands';
-import type { SearchResult, IndexerFolder, SearchMode, MatchType, SortBy, SortDir } from '../../utils/types';
+import { commands } from '../../utils/commands';
+import type { SearchResult, IndexerFolder, SearchMode, MatchType, SortBy, SortDir, SearchHistoryEntry } from '../../utils/types';
 import { ResultCard } from './ResultCard';
 import { PreviewPanel } from './PreviewPanel';
 
@@ -34,9 +34,13 @@ const SORT_OPTIONS = [
   { value: 'name', label: 'По имени' },
 ];
 
-export function SearchView() {
+interface SearchViewProps {
+  initialParams?: SearchHistoryEntry | null;
+  onHistoryUpdate?: () => void;
+}
+
+export function SearchView({ initialParams, onHistoryUpdate }: SearchViewProps) {
   const [query, setQuery] = useState('');
-  const [debouncedQuery] = useDebouncedValue(query, 300);
   const [mode, setMode] = useState<SearchMode>('all');
   const [matchType, setMatchType] = useState<MatchType>('partial');
   const [folderId, setFolderId] = useState<string | null>(null);
@@ -46,43 +50,89 @@ export function SearchView() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [folders, setFolders] = useState<IndexerFolder[]>([]);
-  const [history, setHistory] = useState<string[]>(getSearchHistory());
   const [previewResult, setPreviewResult] = useState<SearchResult | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Load folders for filter
   useEffect(() => {
     commands.listFolders().then(setFolders).catch(console.error);
   }, []);
 
-  // Search
+  // Apply initial params from history click
   useEffect(() => {
-    if (!debouncedQuery.trim()) {
-      setResults([]);
-      return;
+    if (initialParams) {
+      setQuery(initialParams.query);
+      setMode(initialParams.mode);
+      setMatchType(initialParams.match_type);
+      setFolderId(initialParams.folder_id ? initialParams.folder_id.toString() : null);
+      setFileTypes(initialParams.file_types);
+      setSortBy(initialParams.sort_by);
+      setSortDir(initialParams.sort_dir);
+      // Trigger search after state settles
+      setTimeout(() => {
+        performSearchWithParams(
+          initialParams.query,
+          initialParams.mode,
+          initialParams.match_type,
+          initialParams.folder_id,
+          initialParams.file_types,
+          initialParams.sort_by,
+          initialParams.sort_dir,
+        );
+      }, 50);
     }
+  }, [initialParams]);
 
-    setLoading(true);
-    commands
-      .search(
-        debouncedQuery,
-        mode,
-        matchType,
-        folderId ? parseInt(folderId) : null,
-        fileTypes.length > 0 ? fileTypes : null,
-        sortBy,
-        sortDir,
-      )
-      .then((res) => {
+  const performSearchWithParams = useCallback(
+    async (
+      q: string,
+      m: SearchMode,
+      mt: MatchType,
+      fid: number | null,
+      ft: string[],
+      sb: SortBy,
+      sd: SortDir,
+    ) => {
+      if (!q.trim()) {
+        setResults([]);
+        return;
+      }
+
+      setLoading(true);
+      setHasSearched(true);
+      setPreviewResult(null);
+      try {
+        const res = await commands.search(q, m, mt, fid, ft.length > 0 ? ft : null, sb, sd);
         setResults(res);
-        setLoading(false);
-        addToSearchHistory(debouncedQuery);
-        setHistory(getSearchHistory());
-      })
-      .catch((err) => {
+        // Save to history in DB
+        await commands.addSearchHistory(q, m, mt, fid, ft, sb, sd);
+        onHistoryUpdate?.();
+      } catch (err) {
         console.error(err);
+      } finally {
         setLoading(false);
-      });
-  }, [debouncedQuery, mode, matchType, folderId, fileTypes, sortBy, sortDir]);
+      }
+    },
+    [onHistoryUpdate],
+  );
+
+  const performSearch = useCallback(() => {
+    performSearchWithParams(
+      query,
+      mode,
+      matchType,
+      folderId ? parseInt(folderId) : null,
+      fileTypes,
+      sortBy,
+      sortDir,
+    );
+  }, [query, mode, matchType, folderId, fileTypes, sortBy, sortDir, performSearchWithParams]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      performSearch();
+    }
+  };
 
   const folderOptions = folders.map((f) => ({
     value: f.id.toString(),
@@ -97,11 +147,6 @@ export function SearchView() {
     { value: 'md', label: 'Markdown (.md)' },
     { value: 'csv', label: 'CSV (.csv)' },
   ];
-
-  const handleClearHistory = () => {
-    clearSearchHistory();
-    setHistory([]);
-  };
 
   const toggleSortDir = () => {
     setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -119,9 +164,9 @@ export function SearchView() {
     <Box style={{ height: '100%', display: 'flex' }}>
       {/* Main search area */}
       <Stack gap="md" p="md" style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
-        {/* Search input with history autocomplete */}
+        {/* Search input + button */}
         <Group gap="xs" wrap="nowrap">
-          <Autocomplete
+          <TextInput
             id="search-input"
             placeholder="Поиск по документам..."
             leftSection={<IconSearch size={18} />}
@@ -131,21 +176,35 @@ export function SearchView() {
                   variant="subtle"
                   color="gray"
                   size="xs"
-                  onClick={() => { setQuery(''); setResults([]); setPreviewResult(null); }}
+                  onClick={() => {
+                    setQuery('');
+                    setResults([]);
+                    setPreviewResult(null);
+                    setHasSearched(false);
+                  }}
                 >
                   <IconX size={14} />
                 </ActionIcon>
               ) : null
             }
-            data={history}
             value={query}
-            onChange={setQuery}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            onKeyDown={handleKeyDown}
             size="md"
             style={{ flex: 1 }}
             styles={{
               input: { fontSize: '15px' },
             }}
           />
+          <Button
+            color="olive"
+            size="md"
+            onClick={performSearch}
+            loading={loading}
+            leftSection={<IconSearch size={18} />}
+          >
+            Найти
+          </Button>
         </Group>
 
         {/* Filters row */}
@@ -219,22 +278,12 @@ export function SearchView() {
           </Group>
         </Group>
 
-        {/* Results count + clear history */}
-        {debouncedQuery.trim() && !loading && (
-          <Group gap="xs" justify="space-between">
+        {/* Results count */}
+        {hasSearched && !loading && (
+          <Group gap="xs">
             <Badge variant="light" color="olive" size="sm">
               Найдено: {results.length}
             </Badge>
-            {history.length > 0 && (
-              <Text
-                size="xs"
-                c="dimmed"
-                style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                onClick={handleClearHistory}
-              >
-                Очистить историю
-              </Text>
-            )}
           </Group>
         )}
 
@@ -246,7 +295,7 @@ export function SearchView() {
             </Center>
           )}
 
-          {!loading && debouncedQuery.trim() && results.length === 0 && (
+          {!loading && hasSearched && results.length === 0 && (
             <Center py="xl">
               <Stack align="center" gap="xs">
                 <IconFileOff size={48} color="var(--mantine-color-gray-4)" />
@@ -255,11 +304,11 @@ export function SearchView() {
             </Center>
           )}
 
-          {!loading && !debouncedQuery.trim() && (
+          {!loading && !hasSearched && (
             <Center py="xl">
               <Stack align="center" gap="xs">
                 <IconSearch size={48} color="var(--mantine-color-gray-3)" />
-                <Text c="dimmed" size="sm">Введите запрос для поиска</Text>
+                <Text c="dimmed" size="sm">Введите запрос и нажмите Enter или «Найти»</Text>
               </Stack>
             </Center>
           )}
@@ -283,7 +332,7 @@ export function SearchView() {
       {previewResult && (
         <PreviewPanel
           result={previewResult}
-          searchQuery={debouncedQuery}
+          searchQuery={query}
           onClose={handleClosePreview}
         />
       )}

@@ -65,6 +65,9 @@ pub fn run() {
             commands::get_stats,
             commands::toggle_watcher,
             commands::update_exclude_patterns,
+            commands::add_search_history,
+            commands::list_search_history,
+            commands::remove_search_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

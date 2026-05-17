@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   MantineProvider,
   AppShell,
@@ -12,6 +12,8 @@ import {
   Tooltip,
   Loader,
   Progress,
+  ActionIcon,
+  ScrollArea,
 } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import '@mantine/core/styles.css';
@@ -24,12 +26,14 @@ import {
   IconFile,
   IconLetterCase,
   IconCheck,
+  IconX,
+  IconHistory,
 } from '@tabler/icons-react';
 import { theme } from './theme';
 import { SearchView } from './components/Search/SearchView';
 import { SettingsView } from './components/Settings/SettingsView';
 import { commands } from './utils/commands';
-import type { IndexerStats, IndexProgress } from './utils/types';
+import type { IndexerStats, IndexProgress, SearchHistoryEntry } from './utils/types';
 import './App.css';
 
 type View = 'search' | 'settings';
@@ -43,6 +47,8 @@ function App() {
     error_count: 0,
   });
   const [indexingProgress, setIndexingProgress] = useState<Record<number, IndexProgress>>({});
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>([]);
+  const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<SearchHistoryEntry | null>(null);
 
   const loadStats = async () => {
     try {
@@ -53,6 +59,15 @@ function App() {
     }
   };
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const h = await commands.listSearchHistory();
+      setSearchHistory(h);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   // Derived: are we currently indexing anything?
   const activeIndexing = Object.values(indexingProgress);
   const isIndexing = activeIndexing.length > 0;
@@ -62,22 +77,21 @@ function App() {
   const totalTotal = activeIndexing.reduce((sum, p) => sum + p.total, 0);
   const totalPercent = totalTotal > 0 ? Math.round((totalCurrent / totalTotal) * 100) : 0;
 
-  // Load stats & listen for progress updates
+  // Load stats & history & listen for progress updates
   useEffect(() => {
     loadStats();
+    loadHistory();
 
     let unlisten: (() => void) | undefined;
     commands
       .onProgress((data) => {
         if (data.done) {
-          // Remove from active indexing
           setIndexingProgress((prev) => {
             const next = { ...prev };
             delete next[data.folder_id];
             return next;
           });
 
-          // Show toast notification
           const folderName = data.folder_path.split('\\').pop() || data.folder_path;
           notifications.show({
             title: 'Индексация завершена',
@@ -87,10 +101,8 @@ function App() {
             autoClose: 4000,
           });
 
-          // Re-fetch stats
           setTimeout(loadStats, 300);
         } else {
-          // Update active indexing progress
           setIndexingProgress((prev) => ({
             ...prev,
             [data.folder_id]: data,
@@ -126,6 +138,25 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  const handleHistoryClick = (entry: SearchHistoryEntry) => {
+    setSelectedHistoryEntry(entry);
+    setActiveView('search');
+  };
+
+  const handleHistoryDelete = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    try {
+      await commands.removeSearchHistory(id);
+      await loadHistory();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleHistoryUpdate = () => {
+    loadHistory();
+  };
+
   return (
     <MantineProvider theme={theme} defaultColorScheme="light">
       <Notifications position="top-right" zIndex={9999} />
@@ -136,7 +167,7 @@ function App() {
         }}
         padding={0}
       >
-        <AppShell.Navbar p="xs" style={{ background: 'var(--mantine-color-olive-0)' }}>
+        <AppShell.Navbar p="xs" style={{ background: 'var(--mantine-color-olive-0)', display: 'flex', flexDirection: 'column' }}>
           {/* Logo area */}
           <Box mb="md" pt="xs" pb="xs" px="xs">
             <Group gap="sm" wrap="nowrap">
@@ -156,7 +187,10 @@ function App() {
             label="Поиск"
             leftSection={<IconSearch size={18} />}
             active={activeView === 'search'}
-            onClick={() => setActiveView('search')}
+            onClick={() => {
+              setSelectedHistoryEntry(null);
+              setActiveView('search');
+            }}
             color="olive"
             variant="filled"
             style={{ borderRadius: 'var(--mantine-radius-md)' }}
@@ -171,6 +205,58 @@ function App() {
             variant="filled"
             style={{ borderRadius: 'var(--mantine-radius-md)', marginTop: 4 }}
           />
+
+          {/* Search history */}
+          {searchHistory.length > 0 && (
+            <Box mt="sm" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <Divider
+                my="xs"
+                label={
+                  <Group gap={4}>
+                    <IconHistory size={12} />
+                    <span>История поиска</span>
+                  </Group>
+                }
+                labelPosition="center"
+                color="gray.3"
+              />
+              <ScrollArea style={{ flex: 1 }} scrollbarSize={4}>
+                <Stack gap={2}>
+                  {searchHistory.map((entry) => (
+                    <Group
+                      key={entry.id}
+                      gap={4}
+                      wrap="nowrap"
+                      px="xs"
+                      py={4}
+                      style={{
+                        cursor: 'pointer',
+                        borderRadius: 'var(--mantine-radius-sm)',
+                        transition: 'background 0.15s',
+                      }}
+                      className="history-item"
+                      onClick={() => handleHistoryClick(entry)}
+                    >
+                      <IconSearch size={12} color="var(--mantine-color-gray-5)" style={{ flexShrink: 0 }} />
+                      <Text size="xs" truncate style={{ flex: 1 }} title={entry.query}>
+                        {entry.query}
+                      </Text>
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="xs"
+                        onClick={(e) => handleHistoryDelete(e, entry.id)}
+                        style={{ opacity: 0.4 }}
+                        className="history-delete"
+                      >
+                        <IconX size={12} />
+                      </ActionIcon>
+                    </Group>
+                  ))}
+                </Stack>
+              </ScrollArea>
+            </Box>
+          )}
 
           {/* Stats & Indexing Status & Version footer */}
           <Box mt="auto" pt="xs">
@@ -252,7 +338,12 @@ function App() {
 
         <AppShell.Main style={{ height: '100vh', overflow: 'hidden' }}>
           <Box style={{ height: '100%' }}>
-            {activeView === 'search' && <SearchView />}
+            {activeView === 'search' && (
+              <SearchView
+                initialParams={selectedHistoryEntry}
+                onHistoryUpdate={handleHistoryUpdate}
+              />
+            )}
             {activeView === 'settings' && <SettingsView />}
           </Box>
         </AppShell.Main>
