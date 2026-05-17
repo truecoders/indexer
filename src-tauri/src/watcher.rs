@@ -70,6 +70,7 @@ impl WatcherState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_watching(&self, folder_id: i64) -> bool {
         let watchers = self.watchers.lock().unwrap();
         watchers.contains_key(&folder_id)
