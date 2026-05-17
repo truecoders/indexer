@@ -332,7 +332,7 @@ function App() {
               </Tooltip>
             </Stack>
             <Divider color="gray.2" my="xs" />
-            <Text size="xs" c="dimmed" ta="center">v0.1.0</Text>
+            <Text size="xs" c="dimmed" ta="center">v0.99.0</Text>
           </Box>
         </AppShell.Navbar>
 

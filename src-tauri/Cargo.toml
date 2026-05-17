@@ -1,6 +1,6 @@
 [package]
 name = "indexer-app"
-version = "0.1.0"
+version = "0.99.0"
 description = "Индексатор файлов — автономное приложение для поиска по документам"
 authors = ["you"]
 edition = "2021"
