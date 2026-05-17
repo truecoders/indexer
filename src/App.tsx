@@ -24,7 +24,6 @@ import {
   IconFile,
   IconLetterCase,
   IconCheck,
-  IconLoader,
 } from '@tabler/icons-react';
 import { theme } from './theme';
 import { SearchView } from './components/Search/SearchView';

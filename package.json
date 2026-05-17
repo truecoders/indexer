@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:exe": "npm run tauri build && powershell -Command \"Copy-Item -Path src-tauri/target/release/Indexer.exe -Destination ./Indexer.exe -Force\"",
+    "start:exe": "powershell -Command \"Start-Process ./Indexer.exe\""
   },
   "dependencies": {
     "@mantine/core": "^9.2.1",
