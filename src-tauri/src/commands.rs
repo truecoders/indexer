@@ -110,6 +110,22 @@ pub async fn show_in_folder(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to show in folder: {}", e))?;
     }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to show in folder: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("Failed to show in folder: {}", e))?;
+        }
+    }
     Ok(())
 }
 
