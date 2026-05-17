@@ -333,7 +333,7 @@ export function SettingsView() {
                 </Group>
 
                 {/* Exclude patterns editor */}
-                <Collapse opened={isExcludesOpen}>
+                <Collapse expanded={isExcludesOpen}>
                   <TagsInput
                     size="xs"
                     placeholder="node_modules, .git, ~$*, *.tmp"
