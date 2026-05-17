@@ -153,9 +153,9 @@ function App() {
     }
   };
 
-  const handleHistoryUpdate = () => {
+  const handleHistoryUpdate = useCallback(() => {
     loadHistory();
-  };
+  }, [loadHistory]);
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="light">
