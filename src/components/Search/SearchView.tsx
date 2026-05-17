@@ -24,8 +24,8 @@ import {
 } from '@tabler/icons-react';
 import { commands } from '../../utils/commands';
 import type { SearchResult, IndexerFolder, SearchMode, MatchType, SortBy, SortDir, SearchHistoryEntry } from '../../utils/types';
-import { ResultCard } from './ResultCard';
-import { PreviewPanel } from './PreviewPanel';
+import { ResultCard } from './ResultCard.tsx';
+import { PreviewPanel } from './PreviewPanel.tsx';
 
 const SORT_OPTIONS = [
   { value: 'relevance', label: 'По релевантности' },
