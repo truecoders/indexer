@@ -10,8 +10,12 @@ import {
   Divider,
   Stack,
   Tooltip,
+  Loader,
+  Progress,
 } from '@mantine/core';
+import { Notifications, notifications } from '@mantine/notifications';
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import {
   IconSearch,
   IconSettings,
@@ -19,12 +23,14 @@ import {
   IconFolder,
   IconFile,
   IconLetterCase,
+  IconCheck,
+  IconLoader,
 } from '@tabler/icons-react';
 import { theme } from './theme';
 import { SearchView } from './components/Search/SearchView';
 import { SettingsView } from './components/Settings/SettingsView';
 import { commands } from './utils/commands';
-import type { IndexerStats } from './utils/types';
+import type { IndexerStats, IndexProgress } from './utils/types';
 import './App.css';
 
 type View = 'search' | 'settings';
@@ -37,6 +43,7 @@ function App() {
     total_words: 0,
     error_count: 0,
   });
+  const [indexingProgress, setIndexingProgress] = useState<Record<number, IndexProgress>>({});
 
   const loadStats = async () => {
     try {
@@ -47,7 +54,16 @@ function App() {
     }
   };
 
-  // Load stats & listen for updates
+  // Derived: are we currently indexing anything?
+  const activeIndexing = Object.values(indexingProgress);
+  const isIndexing = activeIndexing.length > 0;
+
+  // Total progress across all active indexing jobs
+  const totalCurrent = activeIndexing.reduce((sum, p) => sum + p.current, 0);
+  const totalTotal = activeIndexing.reduce((sum, p) => sum + p.total, 0);
+  const totalPercent = totalTotal > 0 ? Math.round((totalCurrent / totalTotal) * 100) : 0;
+
+  // Load stats & listen for progress updates
   useEffect(() => {
     loadStats();
 
@@ -55,8 +71,31 @@ function App() {
     commands
       .onProgress((data) => {
         if (data.done) {
-          // Re-fetch stats when indexing is done
-          setTimeout(loadStats, 500);
+          // Remove from active indexing
+          setIndexingProgress((prev) => {
+            const next = { ...prev };
+            delete next[data.folder_id];
+            return next;
+          });
+
+          // Show toast notification
+          const folderName = data.folder_path.split('\\').pop() || data.folder_path;
+          notifications.show({
+            title: 'Индексация завершена',
+            message: `${folderName}: ${data.total} файлов проиндексировано`,
+            color: 'olive',
+            icon: <IconCheck size={18} />,
+            autoClose: 4000,
+          });
+
+          // Re-fetch stats
+          setTimeout(loadStats, 300);
+        } else {
+          // Update active indexing progress
+          setIndexingProgress((prev) => ({
+            ...prev,
+            [data.folder_id]: data,
+          }));
         }
       })
       .then((fn) => {
@@ -68,7 +107,7 @@ function App() {
     };
   }, []);
 
-  // Also refresh stats when switching views to be absolutely sure
+  // Also refresh stats when switching views
   useEffect(() => {
     loadStats();
   }, [activeView]);
@@ -90,6 +129,7 @@ function App() {
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="light">
+      <Notifications position="top-right" zIndex={9999} />
       <AppShell
         navbar={{
           width: 220,
@@ -133,8 +173,47 @@ function App() {
             style={{ borderRadius: 'var(--mantine-radius-md)', marginTop: 4 }}
           />
 
-          {/* Stats & Version footer */}
+          {/* Stats & Indexing Status & Version footer */}
           <Box mt="auto" pt="xs">
+            {/* Live indexing indicator */}
+            {isIndexing && (
+              <Box px="xs" mb="xs">
+                <Group gap="xs" mb={4} wrap="nowrap">
+                  <Loader size={14} color="olive" type="dots" />
+                  <Text size="xs" fw={600} c="olive.7">
+                    Индексация... {totalPercent}%
+                  </Text>
+                </Group>
+                <Progress
+                  value={totalPercent}
+                  color="olive"
+                  size="xs"
+                  animated
+                  radius="xl"
+                />
+                {activeIndexing.length === 1 && activeIndexing[0] && (
+                  <Text size="xs" c="dimmed" mt={2} truncate>
+                    {activeIndexing[0].current_file}
+                  </Text>
+                )}
+                {activeIndexing.length > 1 && (
+                  <Text size="xs" c="dimmed" mt={2}>
+                    {activeIndexing.length} папок обрабатывается
+                  </Text>
+                )}
+              </Box>
+            )}
+
+            {/* "Index up to date" when not indexing */}
+            {!isIndexing && stats.file_count > 0 && (
+              <Box px="xs" mb="xs">
+                <Group gap="xs" wrap="nowrap">
+                  <IconCheck size={14} color="var(--mantine-color-olive-6)" />
+                  <Text size="xs" c="olive.7">Индекс актуален</Text>
+                </Group>
+              </Box>
+            )}
+
             <Divider my="xs" label="Статистика" labelPosition="center" color="gray.3" />
             <Stack gap="xs" px="xs" mb="xs">
               <Tooltip label="Всего отслеживаемых папок" position="right">

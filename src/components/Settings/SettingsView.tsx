@@ -13,7 +13,16 @@ import {
   Title,
   Badge,
 } from '@mantine/core';
-import { IconFolderPlus, IconRefresh, IconTrash, IconFolder } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import {
+  IconFolderPlus,
+  IconRefresh,
+  IconTrash,
+  IconFolder,
+  IconCheck,
+  IconX,
+  IconAlertTriangle,
+} from '@tabler/icons-react';
 import { commands } from '../../utils/commands';
 import type { IndexerFolder, IndexerStats, IndexProgress } from '../../utils/types';
 import { StatsPanel } from './StatsPanel';
@@ -60,36 +69,93 @@ export function SettingsView() {
     try {
       const folder = await commands.addFolder();
       if (folder) {
+        const folderName = folder.path.split('\\').pop() || folder.path;
+        notifications.show({
+          title: 'Папка добавлена',
+          message: `${folderName} — индексация запущена`,
+          color: 'olive',
+          icon: <IconFolderPlus size={18} />,
+          autoClose: 3000,
+        });
         await loadData();
       }
     } catch (e) {
-      console.error(e);
+      notifications.show({
+        title: 'Ошибка',
+        message: `Не удалось добавить папку: ${e}`,
+        color: 'red',
+        icon: <IconX size={18} />,
+        autoClose: 5000,
+      });
     }
   };
 
-  const handleRemoveFolder = async (id: number) => {
+  const handleRemoveFolder = async (id: number, path: string) => {
     try {
       await commands.removeFolder(id);
+      const folderName = path.split('\\').pop() || path;
+      notifications.show({
+        title: 'Папка удалена',
+        message: `${folderName} удалена из индекса`,
+        color: 'gray',
+        icon: <IconTrash size={18} />,
+        autoClose: 3000,
+      });
       await loadData();
     } catch (e) {
-      console.error(e);
+      notifications.show({
+        title: 'Ошибка удаления',
+        message: `${e}`,
+        color: 'red',
+        icon: <IconX size={18} />,
+        autoClose: 5000,
+      });
     }
   };
 
-  const handleReindex = async (id: number) => {
+  const handleReindex = async (id: number, path: string) => {
     try {
+      const folderName = path.split('\\').pop() || path;
+      notifications.show({
+        title: 'Переиндексация',
+        message: `${folderName} — запущена...`,
+        color: 'blue',
+        icon: <IconRefresh size={18} />,
+        autoClose: 2000,
+      });
       await commands.reindex(id);
     } catch (e) {
-      console.error(e);
+      notifications.show({
+        title: 'Ошибка переиндексации',
+        message: `${e}`,
+        color: 'red',
+        icon: <IconX size={18} />,
+        autoClose: 5000,
+      });
     }
   };
 
   const handleToggleWatcher = async (id: number, enable: boolean) => {
     try {
       await commands.toggleWatcher(id, enable);
+      notifications.show({
+        title: enable ? 'Отслеживание включено' : 'Отслеживание выключено',
+        message: enable
+          ? 'Изменения файлов будут отслеживаться автоматически'
+          : 'Автоматическое отслеживание отключено',
+        color: enable ? 'olive' : 'gray',
+        icon: enable ? <IconCheck size={18} /> : <IconAlertTriangle size={18} />,
+        autoClose: 2500,
+      });
       await loadData();
     } catch (e) {
-      console.error(e);
+      notifications.show({
+        title: 'Ошибка',
+        message: `${e}`,
+        color: 'red',
+        icon: <IconX size={18} />,
+        autoClose: 5000,
+      });
     }
   };
 
@@ -195,7 +261,7 @@ export function SettingsView() {
                         color="olive"
                         size="sm"
                         loading={isIndexing}
-                        onClick={() => handleReindex(folder.id)}
+                        onClick={() => handleReindex(folder.id, folder.path)}
                       >
                         <IconRefresh size={16} />
                       </ActionIcon>
@@ -205,7 +271,7 @@ export function SettingsView() {
                         variant="subtle"
                         color="red"
                         size="sm"
-                        onClick={() => handleRemoveFolder(folder.id)}
+                        onClick={() => handleRemoveFolder(folder.id, folder.path)}
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
