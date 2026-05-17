@@ -1,0 +1,71 @@
+/* === Global styles for Indexer === */
+
+/* Ensure full-height layout */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Highlighted search matches */
+mark {
+  background-color: rgba(139, 154, 74, 0.3);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Result card hover animation */
+.mantine-Card-root {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mantine-Card-root:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-gray-3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-gray-5);
+}
+
+/* Nav links transition */
+.mantine-NavLink-root {
+  transition: background-color 0.15s ease;
+}
+
+/* Search input focus effect */
+.mantine-TextInput-input:focus {
+  border-color: var(--mantine-color-olive-5);
+  box-shadow: 0 0 0 2px rgba(139, 154, 74, 0.2);
+}
+
+/* Progress bar animation */
+.mantine-Progress-section {
+  transition: width 0.3s ease;
+}
+
+/* Badge transitions */
+.mantine-Badge-root {
+  transition: transform 0.1s ease;
+}
+
+/* Segmented control active style */
+.mantine-SegmentedControl-indicator {
+  background-color: var(--mantine-color-olive-6);
+}

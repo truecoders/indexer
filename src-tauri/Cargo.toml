@@ -1,0 +1,42 @@
+[package]
+name = "indexer-app"
+version = "0.1.0"
+description = "Индексатор файлов — автономное приложение для поиска по документам"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "indexer_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = { version = "2", features = ["windows7-compat"] }
+tauri-plugin-store = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-log = "2"
+tauri-plugin-process = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+walkdir = "2"
+notify = "7"
+notify-debouncer-mini = "0.5"
+encoding_rs = "0.8"
+calamine = "0.26"
+tokio = { version = "1", features = ["full"] }
+log = "0.4"
+zip = "2"
+opener = "0.7"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
